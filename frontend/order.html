@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Place Order</title>
+  <link rel="stylesheet" href="order.css" />
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f9f9f9;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+    }
+
+    .product-box {
+      margin-bottom: 20px;
+    }
+
+    .product-item {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      background-color: #f4f4f4;
+      position: relative;
+    }
+
+    .remove-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: red;
+      color: white;
+      width: 30px;
+      border: none;
+      padding: 2px 4px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 5px;
+      resize: vertical;
+    }
+
+    button[type="submit"] {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin-top: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #message {
+      margin-top: 10px;
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 Confirm Your Order</h1>
+
+    <div id="productSummary" class="product-box">
+      <!-- JS will inject selected products -->
+    </div>
+
+    <form id="orderForm">
+      <label for="address">Address:</label>
+      <textarea id="address" name="address" placeholder="Enter delivery address" required></textarea>
+
+      <button type="submit">✅ Place Order</button>
+      <p id="message"></p>
+    </form>
+  </div>
+
+  <script>
+    const cart = JSON.parse(localStorage.getItem("cart")) || [];
+    const user = JSON.parse(localStorage.getItem("user"));
+    const token = localStorage.getItem("token");
+    const summary = document.getElementById("productSummary");
+    const message = document.getElementById("message");
+
+    if (!user || !token) {
+      alert("Please login first!");
+      window.location.href = "login.html";
+    }
+
+    if (cart.length === 0) {
+      summary.innerHTML = "<p>No items in cart</p>";
+    }
+
+    function renderCartItems() {
+      summary.innerHTML = "";
+      cart.forEach((item, index) => {
+        const div = document.createElement("div");
+        div.className = "product-item";
+        div.innerHTML = `
+          <strong>${item.name}</strong><br>
+          ₹${item.price} <br>
+          <button class="remove-btn" data-index="${index}">❌</button>
+        `;
+        summary.appendChild(div);
+      });
+
+      // Attach remove events
+      document.querySelectorAll(".remove-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const index = btn.getAttribute("data-index");
+          cart.splice(index, 1);
+          localStorage.setItem("cart", JSON.stringify(cart));
+          renderCartItems();
+        });
+      });
+    }
+
+    renderCartItems();
+
+    // 📦 Handle Order Form Submission
+    document.getElementById("orderForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const address = document.getElementById("address").value.trim();
+
+      if (!address) {
+        message.textContent = "Please enter an address.";
+        return;
+      }
+
+      if (cart.length === 0) {
+        message.textContent = "Cart is empty.";
+        return;
+      }
+
+      const payload = {
+        address,
+        product: cart.map(item => ({
+          productname: item.name,
+          price: item.price,
+          quantity: 1
+        }))
+      };
+
+      try {
+        const res = await fetch("http://localhost:8000/user/order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          alert("✅ Order placed successfully!");
+          localStorage.removeItem("cart");
+          window.location.href = "index.html";
+        } else {
+          message.textContent = data.message || "Failed to place order.";
+        }
+      } catch (err) {
+        console.error("Order Error:", err);
+        message.textContent = "Server error!";
+      }
+    });
+  </script>
+</body>
+</html>
